@@ -34,16 +34,18 @@ catkin_package(
   CATKIN_DEPENDS roscpp cv_bridge
 )
 
-LINK_DIRECTORIES(/home/fshs/work/hirop_vision/hirop_vision_install/libs)
+LINK_DIRECTORIES(/home/fshs/work/hirop_vision/out/libs)
+
+add_definitions(-D__LINUX__)
 
 include_directories(
   include
-  /home/fshs/work/hirop_vision/hirop_vision_install/include
+  /home/fshs/work/hirop_vision/out/include
   ${catkin_INCLUDE_DIRS}
 )
 
 add_executable(vision_bridge src/main.cpp src/ros_detector.cpp)
-add_dependencies(vision_bridge  ${catkin_EXPORTED_TARGETS})
+add_dependencies(vision_bridge  ${vision_bridge_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(vision_bridge

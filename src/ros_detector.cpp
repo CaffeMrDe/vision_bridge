@@ -25,7 +25,14 @@ bool DetectorService::detectionCallback(vision_bridge::detection::Request &req, 
         return false;
     }
 
-    mDetectorPtr->detectionOnce(req.objectName, req.detectorName, depth_ptr->image, color_ptr->image);
+    ENTITY_TYPE type;
+    if(req.detectorType == 1)
+        type = PYTHON;
+    else
+        type = CPP;
+
+    mDetectorPtr->setDetector(req.detectorName, req.objectName, type, req.detectorConfig);
+    mDetectorPtr->detectionOnce(depth_ptr->image, color_ptr->image);
 
     return true;
 }
