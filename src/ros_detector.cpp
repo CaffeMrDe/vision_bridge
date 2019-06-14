@@ -11,6 +11,10 @@ DetectorService::DetectorService(NodeHandle n){
 
 int DetectorService::start(){
     detectionServer = mNodeHandle.advertiseService(SERVER_NAME, &DetectorService::detectionCallback, this);
+    listDetectorServer = mNodeHandle.advertiseService(LIST_DETECTOR_SERVER_NAME, \
+                                                      &DetectorService::listDetectorCallBack, this);
+    listObjectServer = mNodeHandle.advertiseService(LIST_OBJECT_SERVER_NAME, \
+                                                    &DetectorService::listObjectCallBack, this);
     depthImgSub = mNodeHandle.subscribe("/kinect2/qhd/image_depth_rect", 1, &DetectorService::depthImgCB, this);
     colorImgSub = mNodeHandle.subscribe("/kinect2/qhd/image_color", 1, &DetectorService::colorImgCB, this);
     posePub = mNodeHandle.advertise<vision_bridge::ObjectArray>("object_array", 1);
@@ -100,4 +104,26 @@ void DetectorService::colorImgCB(const sensor_msgs::ImageConstPtr& msg){
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
     }
+}
+
+bool DetectorService::listDetectorCallBack(vision_bridge::listDetector::Request &req,
+                                           vision_bridge::listDetector::Response &res){
+
+
+    std::vector<std::string> list;
+    mDetectorPtr->getDetectorList(list);
+
+    res.detectorList = list;
+
+    return true;
+}
+
+bool DetectorService::listObjectCallBack(vision_bridge::listObject::Request &req,
+                                         vision_bridge::listObject::Response &res){
+
+    std::vector<std::string> list;
+    mDetectorPtr->getObjectList(req.detectorName, list);
+    res.objectList = list;
+    return true;
+
 }
