@@ -1,5 +1,5 @@
 #include "ros_detctor.h"
-#include "vision_bridge/ObjectArray.h"
+#include <vision_bridge/ObjectArray.h>
 
 using namespace ros;
 
