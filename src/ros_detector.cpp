@@ -14,13 +14,13 @@ int DetectorService::start(){
     /**
      *  获取相关参数
      */
-    mNodeHandle.param("use_depth", _useDepth, false);
-    mNodeHandle.param("use_color", _useColor, true);
+    mNodeHandle.param("/vision_bridge/use_depth", _useDepth, false);
+    mNodeHandle.param("/vision_bridge/use_color", _useColor, true);
 
-    mNodeHandle.param("rgb_topic", _rgbTopicName, std::string("/kinect2/qhd/image_color"));
-    mNodeHandle.param("depth_topic", _depthTopicName, std::string("/kinect2/qhd/image_depth_rect"));
+    mNodeHandle.param("/vision_bridge/rgb_topic", _rgbTopicName, std::string("/kinect2/qhd/image_color"));
+    mNodeHandle.param("/vision_bridge/depth_topic", _depthTopicName, std::string("/kinect2/qhd/image_depth_rect"));
 
-    mNodeHandle.param("camera_frame", _cameraFrame, std::string("kinect2_rgb_optical_frame"));
+    mNodeHandle.param("/vision_bridge/camera_frame", _cameraFrame, std::string("kinect2_rgb_optical_frame"));
 
     /**
      *  发布服务
@@ -51,7 +51,7 @@ int DetectorService::start(){
 
 bool DetectorService::detectionCallback(vision_bridge::detection::Request &req, vision_bridge::detection::Response &res){
 
-    if( ( _useColor && color_ptr == NULL) || ( _useDepth && depth_ptr == NULL)                                                          ){
+    if( ( _useColor && color_ptr == NULL) || ( _useDepth && depth_ptr == NULL) ){
         res.result = -1;
         return false;
     }
@@ -63,7 +63,17 @@ bool DetectorService::detectionCallback(vision_bridge::detection::Request &req, 
         type = CPP;
 
     mDetectorPtr->setDetector(req.detectorName, req.objectName, type, req.detectorConfig);
-    mDetectorPtr->detectionOnce(depth_ptr->image, color_ptr->image);
+
+    cv::Mat depth;
+    cv::Mat color;
+
+    if( _useDepth )
+	depth = depth_ptr->image;
+
+    if( _useColor )
+	color = color_ptr->image;
+
+    mDetectorPtr->detectionOnce(depth, color);
 
     return true;
 }

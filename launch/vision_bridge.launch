@@ -1,7 +1,7 @@
 <launch>
 
   <arg name="use_color"         default="true"/>
-  <arg name="use_depth"         default="false"/>
+  <arg name="use_depth"         default="true"/>
   <arg name="rgb_topic"         default="/kinect2/qhd/image_color"/>
   <arg name="depth_topic"       default="/kinect2/qhd/image_depth_rect"/>
   <arg name="camera_frame"      default="kinect2_rgb_optical_frame"/>
