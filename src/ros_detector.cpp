@@ -10,21 +10,48 @@ DetectorService::DetectorService(NodeHandle n){
 }
 
 int DetectorService::start(){
+
+    /**
+     *  获取相关参数
+     */
+    mNodeHandle.param("use_depth", _useDepth, false);
+    mNodeHandle.param("use_color", _useColor, true);
+
+    mNodeHandle.param("rgb_topic", _rgbTopicName, std::string("/kinect2/qhd/image_color"));
+    mNodeHandle.param("depth_topic", _depthTopicName, std::string("/kinect2/qhd/image_depth_rect"));
+
+    mNodeHandle.param("camera_frame", _cameraFrame, std::string("kinect2_rgb_optical_frame"));
+
+    /**
+     *  发布服务
+     */
     detectionServer = mNodeHandle.advertiseService(SERVER_NAME, &DetectorService::detectionCallback, this);
     listDetectorServer = mNodeHandle.advertiseService(LIST_DETECTOR_SERVER_NAME, \
                                                       &DetectorService::listDetectorCallBack, this);
     listObjectServer = mNodeHandle.advertiseService(LIST_OBJECT_SERVER_NAME, \
                                                     &DetectorService::listObjectCallBack, this);
-    depthImgSub = mNodeHandle.subscribe("/kinect2/qhd/image_depth_rect", 1, &DetectorService::depthImgCB, this);
-    colorImgSub = mNodeHandle.subscribe("/kinect2/qhd/image_color", 1, &DetectorService::colorImgCB, this);
+
+    /**
+     *  订阅深度图
+     */
+    if(_useDepth)
+        depthImgSub = mNodeHandle.subscribe(_depthTopicName, 1, &DetectorService::depthImgCB, this);
+
+    /**
+     *  订阅彩色图
+     */
+    if(_useColor)
+        colorImgSub = mNodeHandle.subscribe(_rgbTopicName, 1, &DetectorService::colorImgCB, this);
+
     posePub = mNodeHandle.advertise<vision_bridge::ObjectArray>("object_array", 1);
+
     ROS_INFO("detector service start finish \n");
 }
 
 
 bool DetectorService::detectionCallback(vision_bridge::detection::Request &req, vision_bridge::detection::Response &res){
 
-    if(color_ptr == NULL || depth_ptr == NULL){
+    if( ( _useColor && color_ptr == NULL) || ( _useDepth && depth_ptr == NULL)                                                          ){
         res.result = -1;
         return false;
     }
@@ -52,7 +79,7 @@ void DetectorService::onDetectDone(std::string detector, int ret, std::vector<po
     vision_bridge::ObjectArray msg;
     ros::Time now;
 
-    msg.header.frame_id = "kinect2_rgb_optical_frame";
+    msg.header.frame_id = _cameraFrame;
 
     msg.header.stamp.nsec = now.now().nsec;
     msg.header.stamp.sec = now.now().sec;

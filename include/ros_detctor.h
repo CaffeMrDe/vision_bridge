@@ -85,21 +85,48 @@ private:
     void colorImgCB(const sensor_msgs::ImageConstPtr& msg);
 
 private:
+    /**
+     * @brief mDetectorPtr  保存检测器的实例指针
+     */
     Detector *mDetectorPtr;
 
+    /**
+     * @brief 各项服务的实例
+     */
     ros::ServiceServer detectionServer;
     ros::ServiceServer listDetectorServer;
     ros::ServiceServer listObjectServer;
 
+    /**
+     * @brief 深度图和彩色图的监听者
+     */
     ros::Subscriber colorImgSub;
     ros::Subscriber depthImgSub;
 
+    /**
+     * @brief mNodeHandle   ROS节点
+     */
     ros::NodeHandle mNodeHandle;
 
+    /**
+     * @brief depth_ptr    全局的图像指针
+     */
     cv_bridge::CvImagePtr depth_ptr;
     cv_bridge::CvImagePtr color_ptr;
 
+    /**
+     * @brief posePub   物体位姿发布器
+     */
     ros::Publisher posePub;
+
+    bool _useDepth;
+    bool _useColor;
+
+    std::string _rgbTopicName;
+    std::string _depthTopicName;
+    std::string _cameraFrame;
+
+
 };
 
 #endif
