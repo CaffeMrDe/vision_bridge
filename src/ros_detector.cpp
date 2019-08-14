@@ -16,10 +16,8 @@ int DetectorService::start(){
      */
     mNodeHandle.param("/vision_bridge/use_depth", _useDepth, false);
     mNodeHandle.param("/vision_bridge/use_color", _useColor, true);
-
     mNodeHandle.param("/vision_bridge/rgb_topic", _rgbTopicName, std::string("/kinect2/qhd/image_color"));
     mNodeHandle.param("/vision_bridge/depth_topic", _depthTopicName, std::string("/kinect2/qhd/image_depth_rect"));
-
     mNodeHandle.param("/vision_bridge/camera_frame", _cameraFrame, std::string("kinect2_rgb_optical_frame"));
 
     /**
