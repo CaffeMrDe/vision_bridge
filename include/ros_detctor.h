@@ -121,10 +121,12 @@ private:
 
     bool _useDepth;
     bool _useColor;
+    bool _isLazy;
 
     std::string _rgbTopicName;
     std::string _depthTopicName;
     std::string _cameraFrame;
+
 
 
 };

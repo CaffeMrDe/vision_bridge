@@ -16,6 +16,7 @@ int DetectorService::start(){
      */
     mNodeHandle.param("/vision_bridge/use_depth", _useDepth, false);
     mNodeHandle.param("/vision_bridge/use_color", _useColor, true);
+    mNodeHandle.param("/vision_bridge/islazy", _isLazy, false);
     mNodeHandle.param("/vision_bridge/rgb_topic", _rgbTopicName, std::string("/kinect2/qhd/image_color"));
     mNodeHandle.param("/vision_bridge/depth_topic", _depthTopicName, std::string("/kinect2/qhd/image_depth_rect"));
     mNodeHandle.param("/vision_bridge/camera_frame", _cameraFrame, std::string("kinect2_rgb_optical_frame"));
@@ -49,8 +50,34 @@ int DetectorService::start(){
 
 bool DetectorService::detectionCallback(vision_bridge::detection::Request &req, vision_bridge::detection::Response &res){
 
+    if(_isLazy){
+        color_ptr = NULL;
+        depth_ptr = NULL;
+    }
+
+    /**
+     *  订阅深度图
+     */
+    if(_useDepth && _isLazy)
+        depthImgSub = mNodeHandle.subscribe(_depthTopicName, 1, &DetectorService::depthImgCB, this);
+
+    if(_useColor && _isLazy)
+        colorImgSub = mNodeHandle.subscribe(_rgbTopicName, 1, &DetectorService::colorImgCB, this);
+
+    /**
+     *  wait for image
+     */
+    for(int i = 0; i < 20; i ++){
+        if( ( _useColor && color_ptr == NULL) || ( _useDepth && depth_ptr == NULL) ){
+            ros::Duration(1.0).sleep();
+            continue;
+        }
+        break;
+    }
+
     if( ( _useColor && color_ptr == NULL) || ( _useDepth && depth_ptr == NULL) ){
         res.result = -1;
+        std::cout << "can't no got img" << std::endl;
         return false;
     }
 
@@ -66,10 +93,10 @@ bool DetectorService::detectionCallback(vision_bridge::detection::Request &req, 
     cv::Mat color;
 
     if( _useDepth )
-	depth = depth_ptr->image;
+        depth = depth_ptr->image;
 
     if( _useColor )
-	color = color_ptr->image;
+        color = color_ptr->image;
 
     mDetectorPtr->detectionOnce(depth, color);
 
@@ -89,8 +116,8 @@ void DetectorService::onDetectDone(std::string detector, int ret, std::vector<po
 
     msg.header.frame_id = _cameraFrame;
 
-    msg.header.stamp.nsec = now.now().nsec;
-    msg.header.stamp.sec = now.now().sec;
+    msg.header.stamp.nsec = ros::Time(0).nsec;
+    msg.header.stamp.sec = ros::Time(0).sec;
 
     for(int i =  0; i < p.size(); i ++){
         vision_bridge::ObjectInfo objectTmp;
@@ -117,6 +144,9 @@ void DetectorService::onDetectDone(std::string detector, int ret, std::vector<po
 }
 
 void DetectorService::depthImgCB(const sensor_msgs::ImageConstPtr& msg){
+
+    std::cout << "Got depth img" << std::endl;
+
     try
     {
         depth_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
@@ -126,9 +156,15 @@ void DetectorService::depthImgCB(const sensor_msgs::ImageConstPtr& msg){
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
     }
+
+    if(_isLazy)
+        depthImgSub.shutdown();
+
 }
 
 void DetectorService::colorImgCB(const sensor_msgs::ImageConstPtr& msg){
+
+    std::cout << "Got color img" << std::endl;
 
     try
     {
@@ -139,6 +175,9 @@ void DetectorService::colorImgCB(const sensor_msgs::ImageConstPtr& msg){
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
     }
+
+    if(_isLazy)
+        colorImgSub.shutdown();
 }
 
 bool DetectorService::listDetectorCallBack(vision_bridge::listDetector::Request &req,
