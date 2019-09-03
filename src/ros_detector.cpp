@@ -1,5 +1,6 @@
 #include "ros_detctor.h"
 #include <tf/transform_broadcaster.h>
+#include <cv_bridge/cv_bridge.h>
 
 using namespace ros;
 
@@ -51,6 +52,9 @@ int DetectorService::start(){
     }
 
     posePub = mNodeHandle.advertise<vision_bridge::ObjectArray>("object_array", 1);
+
+    image_transport::ImageTransport it(mNodeHandle);
+    imgPub = it.advertise("preview_image", 1);
 
     ROS_INFO("detector service start finish \n");
 }
@@ -114,7 +118,7 @@ bool DetectorService::detectionCallback(vision_bridge::detection::Request &req, 
     return true;
 }
 
-void DetectorService::onDetectDone(std::string detector, int ret, std::vector<pose> p){
+void DetectorService::onDetectDone(std::string detector, int ret, std::vector<pose> p, cv::Mat preImg){
 
     ROS_INFO("detector was %s", detector.c_str());
     ROS_INFO("ret was %d", ret);
@@ -155,8 +159,13 @@ void DetectorService::onDetectDone(std::string detector, int ret, std::vector<po
         msg.objects.push_back(objectTmp);
     }
     tfLock.unlock();
-
     posePub.publish(msg);
+
+    if(preImg.size <= 0)
+        return;
+
+    sensor_msgs::ImagePtr imgMsg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", preImg).toImageMsg();
+    imgPub.publish(imgMsg);
 
 }
 

@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   message_generation
   tf
+  image_transport
 )
 
 find_package(hirop_vision REQUIRED)

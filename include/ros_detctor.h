@@ -12,6 +12,8 @@
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 
+#include <image_transport/image_transport.h>
+
 using namespace hirop_vision;
 
 
@@ -34,7 +36,7 @@ public:
      * @param ret           检测器的返回值
      * @param p             检测到物体的位姿列表
      */
-    void onDetectDone(std::string detector, int ret, std::vector<pose> p);
+    void onDetectDone(std::string detector, int ret, std::vector<pose> p, cv::Mat preImg);
 
     /**
      * @brief start     启动检测服务
@@ -125,6 +127,11 @@ private:
      * @brief posePub   物体位姿发布器
      */
     ros::Publisher posePub;
+
+    /**
+     * @brief imgPub    预览图片发布器
+     */
+    image_transport::Publisher imgPub;
 
     /**
      * @brief 节点的相关功能开关

@@ -26,4 +26,8 @@
   <build_export_depend>tf</build_export_depend>
   <exec_depend>tf</exec_depend>
 
+  <build_depend>image_transport</build_depend>
+  <build_export_depend>image_transport</build_export_depend>
+  <exec_depend>image_transport</exec_depend>
+
 </package>
