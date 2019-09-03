@@ -4,6 +4,7 @@
 #include <vision/detector.h>
 #include <ros/ros.h>
 
+#include <vision_bridge/ObjectArray.h>
 #include <vision_bridge/detection.h>
 #include <vision_bridge/listDetector.h>
 #include <vision_bridge/listObject.h>
@@ -84,6 +85,12 @@ private:
      */
     void colorImgCB(const sensor_msgs::ImageConstPtr& msg);
 
+    /**
+     * @brief publishObjectTf   循环发布识别出来物体的坐标，将会以线程的方式被调用
+     * @param rate  发布的频率
+     */
+    void publishObjectTf();
+
 private:
     /**
      * @brief mDetectorPtr  保存检测器的实例指针
@@ -119,16 +126,36 @@ private:
      */
     ros::Publisher posePub;
 
+    /**
+     * @brief 节点的相关功能开关
+     */
     bool _useDepth;
     bool _useColor;
     bool _isLazy;
+    bool _publish_tf;
 
+    /**
+     * @brief 节点相关的配置参数
+     */
     std::string _rgbTopicName;
     std::string _depthTopicName;
     std::string _cameraFrame;
+    int _publish_tf_rate;
 
+    /**
+     * @brief msg   最后一次识别到的物体信息
+     */
+    vision_bridge::ObjectArray msg;
 
+    /**
+     * @brief tfLock    发布坐标时使用的互斥锁
+     */
+    boost::mutex tfLock;
 
+    /**
+     * @brief publishTfThread   发布TF的线程
+     */
+    boost::thread* publishTfThread;
 };
 
 #endif

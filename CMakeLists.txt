@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   geometry_msgs
   message_generation
+  tf
 )
 
 find_package(hirop_vision REQUIRED)
@@ -29,7 +30,7 @@ add_message_files(
 generate_messages(DEPENDENCIES geometry_msgs)
 
 catkin_package(
-  CATKIN_DEPENDS roscpp cv_bridge
+  CATKIN_DEPENDS roscpp cv_bridge tf
 )
 
 add_definitions(-D__LINUX__)

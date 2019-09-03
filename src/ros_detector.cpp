@@ -1,5 +1,5 @@
 #include "ros_detctor.h"
-#include <vision_bridge/ObjectArray.h>
+#include <tf/transform_broadcaster.h>
 
 using namespace ros;
 
@@ -17,6 +17,8 @@ int DetectorService::start(){
     mNodeHandle.param("/vision_bridge/use_depth", _useDepth, false);
     mNodeHandle.param("/vision_bridge/use_color", _useColor, true);
     mNodeHandle.param("/vision_bridge/islazy", _isLazy, false);
+    mNodeHandle.param("/vision_bridge/publish_tf", _publish_tf, true);
+    mNodeHandle.param("/vision_bridge/publish_tf_rate", _publish_tf_rate, 10);
     mNodeHandle.param("/vision_bridge/rgb_topic", _rgbTopicName, std::string("/kinect2/qhd/image_color"));
     mNodeHandle.param("/vision_bridge/depth_topic", _depthTopicName, std::string("/kinect2/qhd/image_depth_rect"));
     mNodeHandle.param("/vision_bridge/camera_frame", _cameraFrame, std::string("kinect2_rgb_optical_frame"));
@@ -41,6 +43,12 @@ int DetectorService::start(){
      */
     if(_useColor)
         colorImgSub = mNodeHandle.subscribe(_rgbTopicName, 1, &DetectorService::colorImgCB, this);
+
+    if(_publish_tf){
+        boost::function0<void> f =  boost::bind(&DetectorService::publishObjectTf,this);
+        publishTfThread = new boost::thread(f);
+        publishTfThread->timed_join(boost::posix_time::microseconds(1));
+    }
 
     posePub = mNodeHandle.advertise<vision_bridge::ObjectArray>("object_array", 1);
 
@@ -75,6 +83,9 @@ bool DetectorService::detectionCallback(vision_bridge::detection::Request &req, 
         break;
     }
 
+    /**
+     *  当20秒后还是没有接受到图像，则认为超时了
+     */
     if( ( _useColor && color_ptr == NULL) || ( _useDepth && depth_ptr == NULL) ){
         res.result = -1;
         std::cout << "can't no got img" << std::endl;
@@ -111,11 +122,16 @@ void DetectorService::onDetectDone(std::string detector, int ret, std::vector<po
         return ;
     ROS_INFO("x = %lf, y = %lf, z = %lf", p[0].position.x, p[0].position.y, p[0].position.z);
 
-    vision_bridge::ObjectArray msg;
-    ros::Time now;
-
+    /**
+     *  先清空之前的识别结果
+     */
+    tfLock.lock();
+    msg.objects.clear();
     msg.header.frame_id = _cameraFrame;
 
+    /**
+     *  将时间戳设置为0,防止在分布式通讯时出现TF过期的问题
+     */
     msg.header.stamp.nsec = ros::Time(0).nsec;
     msg.header.stamp.sec = ros::Time(0).sec;
 
@@ -138,6 +154,7 @@ void DetectorService::onDetectDone(std::string detector, int ret, std::vector<po
 
         msg.objects.push_back(objectTmp);
     }
+    tfLock.unlock();
 
     posePub.publish(msg);
 
@@ -200,4 +217,30 @@ bool DetectorService::listObjectCallBack(vision_bridge::listObject::Request &req
     res.objectList = list;
     return true;
 
+}
+
+void DetectorService::publishObjectTf(){
+
+    ROS_INFO("start publish object tf thread");
+
+    tf::TransformBroadcaster br;
+    tf::Transform transform;
+
+    while(ros::ok()){
+        ros::Rate rate(_publish_tf_rate);
+
+        tfLock.lock();
+
+        for(int i = 0; i < msg.objects.size(); i++){
+            transform.setOrigin( tf::Vector3(msg.objects[i].pose.pose.position.x, msg.objects[i].pose.pose.position.y, \
+                                             msg.objects[i].pose.pose.position.z) );
+            transform.setRotation(tf::Quaternion(msg.objects[i].pose.pose.orientation.x, msg.objects[i].pose.pose.orientation.y,\
+                                                 msg.objects[i].pose.pose.orientation.z, msg.objects[i].pose.pose.orientation.w));
+            br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), _cameraFrame, "object" + i));
+        }
+
+        tfLock.unlock();
+
+        rate.sleep();
+    }
 }
