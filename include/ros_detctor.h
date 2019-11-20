@@ -8,18 +8,20 @@
 #include <vision_bridge/detection.h>
 #include <vision_bridge/listDetector.h>
 #include <vision_bridge/listObject.h>
-
+#include "sensor_msgs/PointCloud2.h"
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
-
+#include "pcl/point_cloud.h"
+#include <pcl_conversions/pcl_conversions.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <image_transport/image_transport.h>
-
 using namespace hirop_vision;
-
 
 #define SERVER_NAME "detection"
 #define LIST_DETECTOR_SERVER_NAME "list_detector"
 #define LIST_OBJECT_SERVER_NAME "list_object"
+
+
 
 class DetectorService:public DetectStateListener{
 
@@ -88,10 +90,19 @@ private:
     void colorImgCB(const sensor_msgs::ImageConstPtr& msg);
 
     /**
+      * @brief pointCloud2CB    接受到点云图后的回调函数 主要是为了接收点云图
+      * @param msg              点云图
+      */
+    void pointCloud2CB(const sensor_msgs::PointCloud2ConstPtr &msg);
+
+    /**
      * @brief publishObjectTf   循环发布识别出来物体的坐标，将会以线程的方式被调用
      * @param rate  发布的频率
      */
     void publishObjectTf();
+
+
+    void colorPointCloud2_SyncxCallBack(const sensor_msgs::ImageConstPtr &msg, const sensor_msgs::PointCloud2ConstPtr &Pmsg);
 
 private:
     /**
@@ -111,6 +122,7 @@ private:
      */
     ros::Subscriber colorImgSub;
     ros::Subscriber depthImgSub;
+    ros::Subscriber pointCloud2Sub;
 
     /**
      * @brief mNodeHandle   ROS节点
@@ -123,6 +135,10 @@ private:
     cv_bridge::CvImagePtr depth_ptr;
     cv_bridge::CvImagePtr color_ptr;
 
+    /**
+      * @brief pointCould2_ptr 全局的点云指针
+      */
+    pcl::PCLPointCloud2 pointcloud2_ptr;
     /**
      * @brief posePub   物体位姿发布器
      */
@@ -140,13 +156,14 @@ private:
     bool _useColor;
     bool _isLazy;
     bool _publish_tf;
-
+    bool _use_pointcloud2;
     /**
      * @brief 节点相关的配置参数
      */
     std::string _rgbTopicName;
     std::string _depthTopicName;
     std::string _cameraFrame;
+    std::string _pointcloud2TopicName;
     int _publish_tf_rate;
 
     /**
@@ -163,6 +180,7 @@ private:
      * @brief publishTfThread   发布TF的线程
      */
     boost::thread* publishTfThread;
+
 };
 
 #endif

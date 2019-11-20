@@ -1,7 +1,8 @@
 #include "ros_detctor.h"
 #include <tf/transform_broadcaster.h>
 #include <cv_bridge/cv_bridge.h>
-
+#include "dbg.h"
+#include "opencv2/highgui.hpp"
 using namespace ros;
 
 DetectorService::DetectorService(NodeHandle n){
@@ -17,12 +18,15 @@ int DetectorService::start(){
      */
     mNodeHandle.param("/vision_bridge/use_depth", _useDepth, false);
     mNodeHandle.param("/vision_bridge/use_color", _useColor, true);
-    mNodeHandle.param("/vision_bridge/islazy", _isLazy, false);
-    mNodeHandle.param("/vision_bridge/publish_tf", _publish_tf, true);
+    mNodeHandle.param("/vision_bridge/use_pointcloud2", _use_pointcloud2, true);
+    mNodeHandle.param("/vision_bridge/islazy", _isLazy, true);
+    mNodeHandle.param("/vision_bridge/publish_tf", _publish_tf, false);
     mNodeHandle.param("/vision_bridge/publish_tf_rate", _publish_tf_rate, 10);
-    mNodeHandle.param("/vision_bridge/rgb_topic", _rgbTopicName, std::string("/kinect2/qhd/image_color"));
+    mNodeHandle.param("/vision_bridge/rgb_topic", _rgbTopicName, std::string("/camera/image"));
     mNodeHandle.param("/vision_bridge/depth_topic", _depthTopicName, std::string("/kinect2/qhd/image_depth_rect"));
+    mNodeHandle.param("/vision_bridge/pointcloud2Topic", _pointcloud2TopicName, std::string("/pcl_test_output"));
     mNodeHandle.param("/vision_bridge/camera_frame", _cameraFrame, std::string("kinect2_rgb_optical_frame"));
+
 
     /**
      *  发布服务
@@ -45,6 +49,12 @@ int DetectorService::start(){
     if(_useColor)
         colorImgSub = mNodeHandle.subscribe(_rgbTopicName, 1, &DetectorService::colorImgCB, this);
 
+//    /**
+//    *  订阅 点云  pointcloud2
+//    */
+    if(_use_pointcloud2)
+        pointCloud2Sub = mNodeHandle.subscribe(_pointcloud2TopicName, 1, &DetectorService::pointCloud2CB, this);
+
     if(_publish_tf){
         boost::function0<void> f =  boost::bind(&DetectorService::publishObjectTf,this);
         publishTfThread = new boost::thread(f);
@@ -59,12 +69,18 @@ int DetectorService::start(){
     ROS_INFO("detector service start finish \n");
 }
 
+int DetectorService::stop()
+{
 
+}
+
+//回调函数
 bool DetectorService::detectionCallback(vision_bridge::detection::Request &req, vision_bridge::detection::Response &res){
 
     if(_isLazy){
         color_ptr = NULL;
         depth_ptr = NULL;
+        pointcloud2_ptr.data.clear();
     }
 
     /**
@@ -76,11 +92,15 @@ bool DetectorService::detectionCallback(vision_bridge::detection::Request &req, 
     if(_useColor && _isLazy)
         colorImgSub = mNodeHandle.subscribe(_rgbTopicName, 1, &DetectorService::colorImgCB, this);
 
+    if(_use_pointcloud2 && _isLazy)
+        pointCloud2Sub = mNodeHandle.subscribe(_pointcloud2TopicName, 1, &DetectorService::pointCloud2CB, this);
+
     /**
      *  wait for image
      */
     for(int i = 0; i < 20; i ++){
-        if( ( _useColor && color_ptr == NULL) || ( _useDepth && depth_ptr == NULL) ){
+        if( ( _useColor && color_ptr == false) || ( _useDepth && depth_ptr == false) \
+                ||(_use_pointcloud2 && (pointcloud2_ptr.data.size() > 0) == false)){
             ros::Duration(1.0).sleep();
             continue;
         }
@@ -90,9 +110,10 @@ bool DetectorService::detectionCallback(vision_bridge::detection::Request &req, 
     /**
      *  当20秒后还是没有接受到图像，则认为超时了
      */
-    if( ( _useColor && color_ptr == NULL) || ( _useDepth && depth_ptr == NULL) ){
+    if( ( _useColor && color_ptr == false) || ( _useDepth && depth_ptr == false)|| \
+            (_use_pointcloud2 && (pointcloud2_ptr.data.size()> 0) == false) ){
         res.result = -1;
-        std::cout << "can't no got img" << std::endl;
+        std::cout << "can't no got img or pointcloud " << std::endl;
         return false;
     }
 
@@ -104,20 +125,29 @@ bool DetectorService::detectionCallback(vision_bridge::detection::Request &req, 
 
     mDetectorPtr->setDetector(req.detectorName, req.objectName, type, req.detectorConfig);
 
+
+    std::cout << "vision bridge detection... " << std::endl;
     cv::Mat depth;
     cv::Mat color;
-
+    pcl::PCLPointCloud2 tempPointCloud;
     if( _useDepth )
         depth = depth_ptr->image;
 
     if( _useColor )
         color = color_ptr->image;
 
-    mDetectorPtr->detectionOnce(depth, color);
+    if( _use_pointcloud2 )
+        pcl::copyPointCloud(pointcloud2_ptr, tempPointCloud);
+
+    //测试代码
+    if(_use_pointcloud2)
+        mDetectorPtr->detectionOnce(depth, color,tempPointCloud);
+    else
+        mDetectorPtr->detectionOnce(depth, color);
 
     return true;
 }
-
+//当检测完成后的回调函数
 void DetectorService::onDetectDone(std::string detector, int ret, std::vector<pose> p, cv::Mat preImg){
 
     ROS_INFO("detector was %s", detector.c_str());
@@ -125,7 +155,7 @@ void DetectorService::onDetectDone(std::string detector, int ret, std::vector<po
     if(p.empty())
         return ;
     ROS_INFO("x = %lf, y = %lf, z = %lf", p[0].position.x, p[0].position.y, p[0].position.z);
-
+    ROS_INFO("--------------------------------------------------");
     /**
      *  先清空之前的识别结果
      */
@@ -190,8 +220,8 @@ void DetectorService::depthImgCB(const sensor_msgs::ImageConstPtr& msg){
 
 void DetectorService::colorImgCB(const sensor_msgs::ImageConstPtr& msg){
 
-    std::cout << "Got color img" << std::endl;
-
+    dbg("Get color img");
+    dbg(msg.get()->header.stamp);
     try
     {
         color_ptr = cv_bridge::toCvCopy(msg, "bgr8");
@@ -206,10 +236,29 @@ void DetectorService::colorImgCB(const sensor_msgs::ImageConstPtr& msg){
         colorImgSub.shutdown();
 }
 
+void DetectorService::pointCloud2CB(const sensor_msgs::PointCloud2ConstPtr &msg)
+{
+    dbg("Get pointCloud2 ");
+    dbg(msg.get()->header.stamp);
+    try
+    {
+
+        pcl_conversions::toPCL(*msg,pointcloud2_ptr);
+    }
+    catch (cv_bridge::Exception& e)
+    {
+        ROS_ERROR("pointcloud2  exception: %s", e.what());
+        return;
+    }
+
+}
+
+
+
 bool DetectorService::listDetectorCallBack(vision_bridge::listDetector::Request &req,
                                            vision_bridge::listDetector::Response &res){
 
-
+    dbg( "listDetectorCallBack.. ");
     std::vector<std::string> list;
     mDetectorPtr->getDetectorList(list);
 
@@ -253,3 +302,5 @@ void DetectorService::publishObjectTf(){
         rate.sleep();
     }
 }
+
+

@@ -13,7 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 find_package(hirop_vision REQUIRED)
-
+find_package(PCL REQUIRED)
 add_service_files(
   FILES
   detection.srv
@@ -40,6 +40,7 @@ include_directories(
   include
   ${hirop_vision_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
 )
 
 add_executable(vision_bridge src/main.cpp src/ros_detector.cpp src/ros_trainer.cpp)
@@ -50,4 +51,5 @@ add_dependencies(vision_bridge  ${vision_bridge_EXPORTED_TARGETS})
 target_link_libraries(vision_bridge
    ${hirop_vision_LIBRARIES}
    ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
  )
